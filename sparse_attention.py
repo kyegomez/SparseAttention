@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import torch.nn.functional as F
-
+from torch import nn
 
 def get_attn_mask(n, attn_mode, local_attn_ctx=None):
     if attn_mode == 'all':
@@ -95,12 +95,32 @@ def blocksparse_attention_impl(q, k, v, heads, attn_mode, local_attn_ctx=None, b
         a = torch.reshape(a, [n, t, embd])
     return a
 
-# Create random inputs
-B, L, E = 4, 1024, 256  # batch size, sequence length, embedding size
-q = torch.randn(B, L, E)
-k = torch.randn(B, L, E)
-v = torch.randn(B, L, E)
+class SparseAttention(nn.Module):
+    def __init__(self, heads, attn_mode, local_attn_ctx=None, blocksize=32):
+        super(SparseAttention, self).__init__()
+        self.heads = heads
+        self.attn_mode = attn_mode
+        self.local_attn_ctx = local_attn_ctx
+        self.blocksize = blocksize
 
-# Forward pass through the blocksparse_attention_impl function
-output_blocksparse = blocksparse_attention_impl(q, k, v, heads=4, attn_mode="all", blocksize=32)
-print(output_blocksparse)  # should be [B, L, E]
+    def forward(self, q, k, v):
+        return blocksparse_attention_impl(q, k, v, self.heads, self.attn_mode, self.local_attn_ctx)
+
+
+# Example usage:
+if __name__ == "__main__":
+    n_batch = 4
+    n_ctx = 1024
+    n_embd = 256
+    heads = 4
+    attn_mode = "all"
+    local_attn_ctx = 32
+    blocksize = 32
+
+    q = torch.randn(n_batch, n_ctx, n_embd)
+    k = torch.randn(n_batch, n_ctx, n_embd)
+    v = torch.randn(n_batch, n_ctx, n_embd)
+
+    model = SparseAttention(heads, attn_mode, local_attn_ctx, blocksize)
+    output = model(q, k, v)
+    print(output[0])
